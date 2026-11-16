@@ -689,7 +689,8 @@ class Other_Player(pygame.sprite.Sprite):
             return
         # mark pending and request once
         client._pending_ops[self.sid] = sheet_hash   # store sid on creation
-        client.sio.emit("sheet_get", {"hash": sheet_hash})
+        if client.sio.connected:                     # added this in v7.2 as a workaround to an error on the next line. The error occurs if the connection is not ready yet. This fix could cause other issues esp with sprites shared over the network.
+            client.sio.emit("sheet_get", {"hash": sheet_hash})
 
 
 class GameEntity(pygame.sprite.Sprite):
