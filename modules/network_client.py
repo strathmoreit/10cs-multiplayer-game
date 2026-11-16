@@ -60,12 +60,21 @@ class NetClient:
 
                 # --- treat *either* SID as "me" ---
                 is_self = (sid == self.sio.sid) or (sid == self.my_sid)
+
                 if is_self:
-                    # lock local player to server (prevents camera/world drift)
                     if self.state.player is not None:
+
+                        # Apply the colour assigned by the server.
+                        # Only recolour if it has changed.
+                        if self.color != color_hex:
+                            self.color = color_hex
+                            self.state.player.set_colour(hex_to_rgb(color_hex))
+
+                        # Keep local position aligned with server
                         self.state.player.x = x
                         self.state.player.y = y
-                        self._last_pos = (x, y)   # keep delta baseline aligned
+                        self._last_pos = (x, y)
+
                     continue
 
                 # ensure a sprite exists for remote players
@@ -288,20 +297,21 @@ class NetClient:
         # compute hash/bytes if possible
         sheet_path = getattr(P, "SHEET", None)
         h = ""; b64 = ""
-        try:
-            if sheet_path:
-                with open(sheet_path, "rb") as f:
-                    b = f.read()
-                if len(b) <= MAX_SHEET_BYTES and is_png(b):
-                    h = sha256_hex(b)
-                    b64 = b64encode_bytes(b)
-                    # cache our own frames locally now
-                    if h not in self.sheet_cache:
-                        surf = load_surface_from_png_bytes(b)
-                        frames = frames_from_surface(surf, cols=cols, count=count, pad=pad, scale=scale)
-                        self.sheet_cache[h] = {"frames": frames, "meta": {"cols": cols, "count": count, "pad": pad, "scale": scale}}
-        except Exception:
-            pass
+        if sheet_path != "assets/player_sheet.png":
+            try:
+                if sheet_path:
+                    with open(sheet_path, "rb") as f:
+                        b = f.read()
+                    if len(b) <= MAX_SHEET_BYTES and is_png(b):
+                        h = sha256_hex(b)
+                        b64 = b64encode_bytes(b)
+                        # cache our own frames locally now
+                        if h not in self.sheet_cache:
+                            surf = load_surface_from_png_bytes(b)
+                            frames = frames_from_surface(surf, cols=cols, count=count, pad=pad, scale=scale)
+                            self.sheet_cache[h] = {"frames": frames, "meta": {"cols": cols, "count": count, "pad": pad, "scale": scale}}
+            except Exception:
+                pass
 
         return {
             "hash": h, "count": count, "cols": cols, "pad": pad, "scale": scale,

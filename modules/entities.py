@@ -402,8 +402,8 @@ class Player_V7(pygame.sprite.Sprite):
 
 class BasePlayer(pygame.sprite.Sprite):
     # --- Students set only these two ---
-    SHEET       = None          # e.g. "assets/my_character.png"
-    SHEET_COUNT = 1             # total frames; 1 = no animation
+    SHEET = "assets/player_sheet.png"          # e.g. "assets/my_character.png"
+    SHEET_COUNT = 9                             # total frames; 1 = no animation
 
     # --- Defaults students rarely touch ---
     SHEET_COLS  = None          # None = single-row strip split into SHEET_COUNT
@@ -435,13 +435,32 @@ class BasePlayer(pygame.sprite.Sprite):
         self.frame_count   = 0          # counts ticks up to ANIM_SPEED
 
         # load frames or fallback square
-        self.frames = self._load_frames_or_square(colour)
-        self.image  = self.frames[self.current_frame]
-
+        self.base_frames = self._load_frames_or_square(colour)
+        self.frames = [frame.copy() for frame in self.base_frames]
+        self.image = self.frames[self.current_frame]
+        if self.SHEET:
+            self.set_colour(colour)
+        
         # camera-locked draw rect and a simple hit rect
         self.rect = self.image.get_rect(center=(WIDTH // 2, HEIGHT // 2))
         self.hit_rect = pygame.Rect(0, 0, 40, 40)
         self.hit_rect.center = (WIDTH // 2, HEIGHT // 2)
+
+    def set_colour(self, colour):
+        self.colour = colour
+
+        highlight = colour
+        shadow = tuple(int(c * 0.6) for c in colour)
+
+        self.frames = []
+
+        for base in self.base_frames:
+            image = base.copy()
+            image = pallete_swap(image, OLD_COLOR_HIGHLIGHT, highlight)
+            image = pallete_swap(image, OLD_COLOR_SHADOW, shadow)
+            self.frames.append(image)
+
+        self.image = self.frames[self.current_frame]
 
     # Intentionally empty so students can own update() logic safely.
     def update(self):
@@ -537,8 +556,8 @@ class BasePlayer(pygame.sprite.Sprite):
                             i = i + 1
                         frames = scaled
                     return frames
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Sprite loading error ({self.SHEET}): {e}")
 
         # Fallback single-frame so game still runs
         surf = pygame.Surface((20, 20), pygame.SRCALPHA)
@@ -546,95 +565,33 @@ class BasePlayer(pygame.sprite.Sprite):
         self.SHEET_COUNT = 1
         return [surf]
 
-    # 1-row strip: width split into frame_count equal parts
     def _load_sprite_strip(self, path, frame_count):
         sheet = pygame.image.load(path).convert_alpha()
         sw, sh = sheet.get_size()
-        #fw = sw // int(frame_count)
-        fw = 60
+
+        fw = 60  # Intended width of each frame
+        required_width = fw * frame_count
+
+        # Pad the image if it is slightly too narrow
+        if sw < required_width:
+            padded = pygame.Surface(
+                (required_width, sh), pygame.SRCALPHA
+            )
+            padded.blit(sheet, (0, 0))
+            sheet = padded
+
         frames = []
-        x = 0
-        i = 0
-        while i < frame_count:
-            rect = pygame.Rect(x, 0, fw, sh)
+
+        for i in range(frame_count):
+            rect = pygame.Rect(i * fw, 0, fw, sh)
             frames.append(sheet.subsurface(rect).copy())
-            x = x + fw
-            i = i + 1
+
         return frames
 
     # This wraps the global load_frames_grid function. Added this after accidentally creating a second version of it here
     def _load_frames_grid(self, path, cols, count, pad):
         # Fix frame width at 60px; height still derived from rows
         return load_frames_grid(path, cols=cols, count=count, pad=pad, frame_w=60)
-
-class Other_Player_V7(pygame.sprite.Sprite):
-    def __init__(self):
-        super().__init__()
-        #self.image = pygame.image.load("sprites/player_idle.png").convert_alpha()
-        self.x = PLAYER_START_X
-        self.y = PLAYER_START_Y
-        self.speed = PLAYER_SPEED
-        self.color_highlight = (21,129,48)
-        self.color_shadow = (15,82,51)
-        #self.frames = ["sprites/player_idle.png", "sprites/player_move_1.png", "sprites/player_move_2.png", "sprites/player_move_3.png", "sprites/player_move_4.png", "sprites/player_move_5.png", "sprites/player_move_6.png", "sprites/player_move_7.png", "sprites/player_move_8.png"]
-        self.frames = load_frames_grid("assets/player_sheet.png", cols=9, count=9, pad=1)
-        self.images = []
-        for fra in self.frames:
-            new_image = (pygame.image.load(fra).convert_alpha())
-            new_image = pygame.transform.scale(new_image, (new_image.get_width()*.66, new_image.get_height()*.66))
-            self.images.append(new_image)
-        self.current_frame = 0 # which frame is currently shown
-        self.frame_count = 0   # how long has the current frame been shown for
-        self.anim_speed = 5  # how often we change the frame when animating
-        self.facing = "right"
-        self.animation_state = "idle_right"  # added animation state V4.2 to manage animation of network players
-        self.image = self.images[self.current_frame]
-        self.rect = self.image.get_rect(center=(self.x,self.y))
-        self.hit_rect = pygame.Rect(620, 360, 40, 40)
-    
-    def set_colour(self, colour):
-        self.color_highlight = (colour)
-        self.color_shadow = (colour)
-        self.images = []
-        for fra in self.frames:
-            new_image = (pygame.image.load(fra).convert_alpha())
-            new_image = pygame.transform.scale(new_image, (new_image.get_width()*.66, new_image.get_height()*.66))
-            new_image = pallete_swap(new_image, OLD_COLOR_HIGHLIGHT, self.color_highlight)
-            new_image = pallete_swap(new_image, OLD_COLOR_SHADOW, self.color_shadow)
-            self.images.append(new_image)
-    
-    def get_image(self):
-        next_frame = self.current_frame
-        if self.animation_state == "idle_right" or self.animation_state == "idle_left":
-            next_frame = 0
-            self.frame_count = 0
-        else:
-            if self.current_frame == 0: # we have just started moving
-                next_frame = 1
-                self.frame_count = 0
-            else:  # we are continuing to move, change the frame if we have waited long enough
-                self.frame_count += 1
-                if self.frame_count > self.anim_speed:
-                    next_frame = self.current_frame + 1
-                    self.frame_count = 0
-                    if next_frame > len(self.frames) -1:
-                        next_frame = 1
-        self.current_frame = next_frame
-        
-        try: # the following code is returning errors now and then. Could try top work out why, but we'll just use a try for now (V4.2)
-            #if self.current_frame <= len(self.images):  # added this check in V4.2. I seem to get an index error sometimes where it tries to use image 1 when there is only one image. Might be happening when I first connect a client... maybe I am moving before all the images are loaded?
-                self.image = self.images[self.current_frame]            
-        except:
-            pass
-                
-        if self.animation_state == "idle_left" or self.animation_state == "walk_left":
-            self.image = pygame.transform.flip(self.image,True,False)
-
-    def update(self, player_x, player_y):
-        self.get_image()
-        #print("Other Player animation state is " + self.animation_state)
-        self.rect = self.image.get_rect(center=(self.x-player_x+(WIDTH//2),self.y-player_y+(HEIGHT//2)))
-
 
 class Other_Player(pygame.sprite.Sprite):
     def __init__(self):
@@ -668,20 +625,20 @@ class Other_Player(pygame.sprite.Sprite):
         self.hit_rect.center = (self.x, self.y)
 
     def set_colour(self, colour):
-        """Rebuild self.images by palette-swapping copies of base frames."""
         self.color_highlight = colour
-        self.color_shadow    = colour
-        new_images = []
-        for base in self.base_frames:
-            img = base.copy()
-            # apply your palette swaps onto the copy
-            img = pallete_swap(img, OLD_COLOR_HIGHLIGHT, self.color_highlight)
-            img = pallete_swap(img, OLD_COLOR_SHADOW,    self.color_shadow)
-            new_images.append(img)
-        self.images = new_images
-        # keep current frame valid
-        self.current_frame = min(self.current_frame, len(self.images) - 1)
-        self.image = self.images[self.current_frame]
+        self.color_shadow = tuple(int(c * 0.6) for c in colour)
+
+        self.images = []
+
+        for frame in self.base_frames:
+            new_image = frame.copy()
+            new_image = pallete_swap(
+                new_image, OLD_COLOR_HIGHLIGHT, self.color_highlight
+            )
+            new_image = pallete_swap(
+                new_image, OLD_COLOR_SHADOW, self.color_shadow
+            )
+            self.images.append(new_image)
 
     def get_image(self):
         # choose next frame index
@@ -802,6 +759,252 @@ class GameEntity(pygame.sprite.Sprite):
         sx = int(self.x - cam_x + (screen_w // 2))
         sy = int(self.y - cam_y + (screen_h // 2))
         self.rect = self.image.get_rect(center=(sx, sy))
+
+class Room(pygame.sprite.Sprite):
+    def __init__(self, x, y, player, image_path, hitboxes=None):
+        super().__init__()
+
+        self.image = pygame.image.load(image_path).convert_alpha()
+
+        self.x = x
+        self.y = y
+        self.player = player
+
+        self.rect = self.image.get_rect(center=(self.x, self.y))
+
+        # Polygon coordinates are relative to the room image
+        self.hitboxes = hitboxes if hitboxes is not None else []
+
+        self.draw_hitboxes = False
+
+    def hit_test(self, rect):
+        for hitbox in self.hitboxes:
+            new_poly = []
+
+            for point in hitbox:
+                new_x = self.rect.topleft[0] + point[0]
+                new_y = self.rect.topleft[1] + point[1]
+                new_poly.append([new_x, new_y])
+
+            result = collideRectPolygon(rect, new_poly)
+
+            if result == True:
+                return result
+
+        return False
+
+    def contains_world_point(self, x, y):
+        # Convert world coordinates to coordinates within the image
+        left = self.x - self.image.get_width() / 2
+        top = self.y - self.image.get_height() / 2
+
+        local_x = int(x - left)
+        local_y = int(y - top)
+
+        # Outside the room image
+        if not (0 <= local_x < self.image.get_width() and
+                0 <= local_y < self.image.get_height()):
+            return False
+
+        # Check whether this pixel belongs to the room artwork
+        return self.image.get_at((local_x, local_y)).a > 0
+
+    def update(self):
+        self.rect = self.image.get_rect(
+            center=(
+                self.x - self.player.x + WIDTH // 2,
+                self.y - self.player.y + HEIGHT // 2
+            )
+        )
+
+        if self.draw_hitboxes:
+            for hitbox in self.hitboxes:
+                pygame.draw.polygon(self.image, (255, 0, 0), hitbox)
+
+CAFETERIA_HITBOXES = [[(33,238), (197,76), (722,76), (962,316), (964,379), (987,382), (989,369), (973,370), (971,248), (727,4), (194,3), (23,170), (22,369), (5,369), (5,380), (34,381), (33,238)], [(147,285), (168,339), (207,367), (242,377), (270,354), (301,377), (346,358), (376,329), (387,283), (361,282), (385,270), (366,234), (338,213), (294,197), (286,210), (254,210), (249,194), (209,205), (174,228), (149,270), (173,280), (147,285)],[(358,502), (365,537), (383,564), (414,586), (454,599), (467,574), (499,573), (513,597), (557,578), (589,545), (599,502), (574,499), (597,490), (584,458), (556,433), (505,415), (496,429), (467,429), (460,414), (427,420), (397,438), (373,461), (361,492), (387,499), (358,502)],[(561,279), (570,322), (593,347), (625,366), (657,375), (671,343), (699,342), (716,374), (755,358), (785,332), (801,300), (802,279), (775,277), (800,265), (787,234), (759,210), (727,196), (708,191), (700,206), (669,204), (663,189), (628,198), (595,218), (573,242), (564,269), (589,276), (561,279)], [(990,538), (963,538), (963,730), (750,943), (555,943), (555,993), (565,993), (566,954), (754,954), (973,733), (974,548), (990,548), (990,538)], [(5,538), (33,538), (33,738), (240,944), (430,944), (429,993), (418,993), (419,955), (233,954), (22,743), (22,548), (5,548), (5,538)], [(561,716), (568,751), (586,778), (617,800), (657,813), (670,788), (702,787), (716,811), (760,792), (792,759), (802,716), (777,713), (800,704), (787,672), (759,647), (708,629), (699,643), (670,643), (663,628), (630,634), (600,652), (576,675), (564,706), (590,713), (561,716)], [(146,715), (153,750), (171,777), (202,799), (242,812), (255,787), (287,786), (301,810), (345,791), (377,758), (387,715), (362,712), (385,703), (372,671), (344,646), (293,628), (284,642), (255,642), (248,627), (215,633), (185,651), (161,674), (149,705), (175,712), (146,715)]]
+
+CORRIDOR_HITBOXES = [
+    # Upper outer wall
+    [(130, 0), (820, 0), (820, 82),
+     (195, 82), (166, 86), (148, 102),
+     (143, 130), (143, 22)],
+
+    # Left wall of vertical corridor
+    [(114, 90), (145, 90), (145, 375),
+     (136, 397), (120, 410), (0, 410),
+     (0, 394), (113, 394)],
+
+    # Inner wall above right-hand opening
+    [(379, 175), (820, 175), (820, 261),
+     (379, 261), (349, 277), (331, 302),
+     (315, 302), (315, 223), (330, 196),
+     (352, 181)],
+
+    # Inner wall along right side of vertical corridor
+    [(315, 302), (339, 302), (339, 684),
+     (315, 684), (315, 576), (325, 546),
+     (325, 330)],
+
+    # Left wall of lower horizontal corridor
+    [(0, 395), (125, 395), (145, 378),
+     (145, 469), (126, 485), (0, 485)],
+
+    # Lower outer wall
+    [(0, 581), (273, 581), (303, 564),
+     (325, 534), (339, 534), (339, 639),
+     (315, 659), (287, 674), (0, 674)]
+]
+
+SECURITY_HITBOXES = [
+    # Top wall and upper-left corner
+    [(48, 0), (194, 0), (264, 68),
+     (264, 84), (190, 12), (91, 12),
+     (37, 69), (37, 192), (0, 192),
+     (0, 68)],
+
+    # Left wall above entrance
+    [(0, 68), (37, 68),
+     (37, 252), (0, 252)],
+
+    # Left wall below entrance
+    [(0, 348), (37, 348),
+     (37, 468), (0, 468)],
+
+    # Right wall
+    [(250, 68), (264, 68),
+     (264, 468), (250, 468)],
+
+    # Bottom wall
+    [(0, 452), (264, 452),
+     (264, 468), (0, 468)],
+
+    # Desk and equipment
+    [(177, 236), (264, 236),
+     (264, 343), (230, 343),
+     (211, 337), (211, 278),
+     (175, 274), (167, 263),
+     (167, 246)]
+]
+
+def mirror_hitboxes(hitboxes, image_width):
+    return [
+        [(image_width - x, y) for x, y in polygon]
+        for polygon in hitboxes
+    ]
+
+SECURITY_MIRRORED_HITBOXES = mirror_hitboxes(
+    SECURITY_HITBOXES,
+    264
+)
+
+STORAGE_HITBOXES = [
+    # Top wall
+    [(0, 0), (612, 0), (612, 20), (0, 20)],
+
+    # Left wall above doorway
+    [(0, 0), (49, 0), (49, 77), (0, 77)],
+
+    # Left wall below doorway
+    [(0, 174), (153, 174), (153, 317),
+     (139, 317), (139, 190), (15, 190),
+     (15, 174)],
+
+    # Shelving unit
+    [(159, 20), (300, 20), (300, 97),
+     (159, 97)],
+
+    # Upper storage crates
+    [(329, 26), (406, 26), (406, 142),
+     (350, 142), (329, 112)],
+
+    [(400, 48), (478, 48), (478, 120),
+     (400, 120)],
+
+    [(477, 20), (563, 20), (563, 112),
+     (477, 112)],
+
+    [(489, 97), (568, 97), (568, 198),
+     (489, 198)],
+
+    # Barrels
+    [(399, 69), (452, 69), (452, 164),
+     (399, 164)],
+
+    [(435, 89), (494, 89), (494, 177),
+     (435, 177)],
+
+    # Left crate
+    [(39, 214), (130, 214), (130, 321),
+     (39, 321)],
+
+    # Left barrel
+    [(152, 217), (207, 217), (207, 305),
+     (152, 305)],
+
+    # Lower crate
+    [(150, 257), (248, 257), (248, 318),
+     (150, 318)],
+
+    # Lower-right crate
+    [(482, 258), (571, 258), (571, 318),
+     (482, 318)],
+
+    # Bottom wall and partitions
+    [(139, 307), (612, 307), (612, 414),
+     (139, 414)],
+
+    # Right wall
+    [(570, 0), (612, 0), (612, 414),
+     (570, 414)]
+]
+
+WEAPONS_HITBOXES = [
+    # Upper-left wall and structure
+    [(0, 0), (376, 0), (376, 152),
+     (89, 152), (89, 198), (0, 198)],
+
+    # Upper-right wall
+    [(512, 0), (598, 0), (598, 198),
+     (558, 198), (558, 153), (512, 153)],
+
+    # Left wall
+    [(0, 198), (106, 198), (106, 571),
+     (89, 571), (89, 379), (0, 379)],
+
+    # Upper wall panels, left of entrance
+    [(90, 152), (375, 152),
+     (375, 227), (90, 227)],
+
+    # Upper wall panels, right of entrance
+    [(513, 152), (563, 152),
+     (563, 228), (513, 228)],
+
+    # Console / desk on left
+    [(106, 211), (215, 211),
+     (215, 244), (187, 267),
+     (155, 287), (149, 347),
+     (131, 362), (106, 362)],
+
+    # Large weapons machinery
+    [(106, 376), (306, 376),
+     (327, 389), (344, 416),
+     (348, 461), (335, 500),
+     (106, 500)],
+
+    # Bottom wall
+    [(89, 500), (445, 500),
+     (445, 606), (89, 606)],
+
+    # Sloping lower-right wall
+    [(445, 500), (558, 387),
+     (598, 387), (598, 606),
+     (445, 606)],
+
+    # Right wall
+    [(558, 198), (598, 198),
+     (598, 387), (558, 387)]
+]
+
 
 class Cafeteria(pygame.sprite.Sprite):
     def __init__(self, x, y, player):

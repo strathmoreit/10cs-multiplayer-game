@@ -26,6 +26,7 @@ def frames_from_surface(sheet: pygame.Surface, *, cols: int, count: int, pad: in
     rows = math.ceil(count / cols)
     fw = (sw - (cols - 1) * pad) // cols
     fh = (sh - (rows - 1) * pad) // rows
+    print(f"[sprites] sheet={sw}x{sh}, cols={cols}, count={count}, frame={fw}x{fh}")
     frames = []
     for r in range(rows):
         for c in range(cols):

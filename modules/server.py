@@ -2,7 +2,7 @@
 import random
 import socketio
 from aiohttp import web
-from settings import WIDTH, HEIGHT, PLAYER_START_X, PLAYER_START_Y 
+from settings import WIDTH, HEIGHT, PLAYER_START_X, PLAYER_START_Y, PLAYER_COLOURS 
 import base64
 from assets_net import MAX_SHEET_BYTES, is_png  # used by sheet_register
 
@@ -21,9 +21,24 @@ sio.attach(app)
 # Authoritative world state: { sid: {"x": int, "y": int, "name": str, "color": str} }
 WORLD = {}
 
+def rgb_to_hex(colour):
+    return "#{:02x}{:02x}{:02x}".format(*colour)
+
+def assign_player_colour():
+    used = {p["color"] for p in WORLD.values()}
+
+    for colour in PLAYER_COLOURS.values():
+        colour_hex = rgb_to_hex(colour)
+
+        if colour_hex not in used:
+            return colour_hex
+
+    # All colours are in use.
+    return rgb_to_hex(random.choice(list(PLAYER_COLOURS.values())))
+
 async def on_connect(sid, environ, auth=None):
-    name  = (auth or {}).get("name")  or sid[:5]
-    color = (auth or {}).get("color") or "#64b5f6"
+    name = (auth or {}).get("name") or sid[:5]
+    color = assign_player_colour()
 
     # If you kept Fix A's constants, ignore them for now
     # Use the client's spawn if provided; else fall back to your game defaults

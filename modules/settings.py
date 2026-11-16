@@ -35,6 +35,6 @@ TEAL = (0, 128, 128)
 LIME = (57, 255, 20)
 PLAYER_COLOURS = {1:RED, 2:ORANGE, 3:BLACK, 4:BLUE, 5:PINK, 6:WHITE, 7:GREEN, 8:YELLOW, 9:BROWN, 10:CYAN, 11:PURPLE, 12:MAGENTA, 13:DARK_GREEN, 14:GOLD, 15:TEAL, 16:LIME}
 
-# Player sprite colours for repplacement
+# Player sprite colours for replacement
 OLD_COLOR_HIGHLIGHT = (255,0,0)
 OLD_COLOR_SHADOW = (0,0,255)

@@ -14,7 +14,8 @@ from modules.network_client import NetClient
 from modules.player_loader import make_player
 from student_code import *
 
-SERVER_URL = "http://localhost:8000"  # or "http://<host-lan-ip>:8000" on students' PCs
+#SERVER_URL = "http://localhost:8000"  # or "http://<host-lan-ip>:8000" on students' PCs
+SERVER_URL = "http://10.128.107.9:8000"
 
 # Set up the game window
 pygame.init()
@@ -121,13 +122,53 @@ def run_interactions(state):
         nearest._last_interact_time = now
         nearest.on_interact(state)
 
+
+RESPAWN_DELAY = 2000  # milliseconds
+
+def check_player_in_map(state):
+    player = state.player
+    now = pygame.time.get_ticks()
+
+    # Player is already dead: wait until respawn time
+    if player.dead:
+        if now >= player.respawn_time:
+            player.x = PLAYER_START_X
+            player.y = PLAYER_START_Y
+            player.prev_x = player.x
+            player.prev_y = player.y
+            player.dead = False
+
+            state.hud.add_msg(
+                "Respawned!",
+                color=(100, 255, 100),
+                duration_ms=1500
+            )
+        return
+
+    # Check whether player is inside any room
+    in_map = any(
+        room.contains_world_point(player.x, player.y)
+        for room in state.rooms_group
+    )
+
+    if not in_map:
+        player.dead = True
+        player.respawn_time = now + RESPAWN_DELAY
+
+        state.hud.add_msg(
+            "You died! Respawning...",
+            color=(255, 80, 80),
+            duration_ms=RESPAWN_DELAY
+        )
+
 def update_game_state(state):
     # --- snapshot player position BEFORE any updates this frame ---
     if state.player is not None:
         state.player.prev_x, state.player.prev_y = state.player.x, state.player.y
 
     '''applies data recieved from the network in the last game loop'''
-    state.player_group.update()
+    if not state.player.dead:   # added at v7.2 while adding a check if player is in space
+        state.player_group.update()
     state.projectiles_group.update()
     for ent in state.entities_group:
         ent.update(state.player.x, state.player.y, WIDTH, HEIGHT)
@@ -168,6 +209,10 @@ def update_game_state(state):
     if collided:
         state.player.move_back()
 
+    # Check if the player is in space
+    check_player_in_map(state)
+
+
 def draw_group(surface, group):
     for spr in group.sprites():
         if hasattr(spr, "draw"):
@@ -195,6 +240,8 @@ def draw_game(state):
 
 # Set up the game
 state.player = make_player(RED, state.projectiles_group, state.screen, PLAYER_START_X, PLAYER_START_Y)
+state.player.dead = False       # added v7.2 - implementing check if player is in space
+state.player.respawn_time = 0   # added v7.2 - implementing check if player is in space
 #state.player = Player(RED, state.projectiles_group,state.screen)  #Debug code - revert to the player class from entities instead of a student written Player class
 state.player_group.add(state.player) # I created a group with just the player so I can call the draw method on the group
 state.chat_box = TextBox(WIDTH - 410,HEIGHT - 35,400,20)
@@ -211,8 +258,48 @@ if state.mode in ("client","auto"):
         state.mode = "offline"
 
 # Set up Rooms
-cafeteria = Cafeteria(WIDTH//2,HEIGHT//2+200, state.player)
+# Set up Rooms
+cafeteria = Room(
+    WIDTH // 2,
+    HEIGHT // 2 + 200,
+    state.player,
+    "maps/cafeteria.png",
+    CAFETERIA_HITBOXES
+)
+
+
+
+corridor = Room(
+    1500, 350,
+    state.player,
+    "maps/corridoor.png",
+    CORRIDOR_HITBOXES
+)
+
+security = Room(
+    25, 470,
+    state.player,
+    "maps/security.png",
+    SECURITY_MIRRORED_HITBOXES
+)
+
+storage = Room(
+    2200, 210,
+    state.player,
+    "maps/storage.png",
+    STORAGE_HITBOXES
+)
+weapons = Room(
+    475, 1250,
+    state.player,
+    "maps/weapon.png",
+    WEAPONS_HITBOXES
+)
+
+state.rooms_group.add(security, storage)
+state.rooms_group.add(corridor)
 state.rooms_group.add(cafeteria)
+state.rooms_group.add(weapons)
 
 # Add entities
 #crate = Crate(0,0,state)
