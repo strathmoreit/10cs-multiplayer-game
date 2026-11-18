@@ -267,7 +267,13 @@ cafeteria = Room(
     CAFETERIA_HITBOXES
 )
 
-
+cafeteria2 = Room(
+    -650,
+    HEIGHT // 2 + 200,
+    state.player,
+    "maps/cafeteria.png",
+    CAFETERIA_HITBOXES
+)
 
 corridor = Room(
     1500, 350,
@@ -298,7 +304,7 @@ weapons = Room(
 
 state.rooms_group.add(security, storage)
 state.rooms_group.add(corridor)
-state.rooms_group.add(cafeteria)
+state.rooms_group.add(cafeteria, cafeteria2)
 state.rooms_group.add(weapons)
 
 # Add entities
